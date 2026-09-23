@@ -96,8 +96,10 @@ async def run_plan(persona_id: str, time_of_day: str, free_text: str | None = No
         f'The user also asked, in their own words: "{free_text}". Take this into account when ranking and framing the plan.'
         if free_text else ""
     )
+    progress_instruction = _build_progress_instruction(persona_id)
+    combined_instruction = " ".join(p for p in [optional_free_text_instruction, progress_instruction] if p)
 
-    plan_items, reasoning_event, telem = _reason_over_tool_data(as_of, time_of_day, tool_data, optional_free_text_instruction)
+    plan_items, reasoning_event, telem = _reason_over_tool_data(as_of, time_of_day, tool_data, combined_instruction)
     yield reasoning_event
 
     # Cache everything needed to re-reason from human feedback without
@@ -127,6 +129,38 @@ async def run_plan(persona_id: str, time_of_day: str, free_text: str | None = No
             plan=plan_items, summary=summary,
         ),
     )
+
+
+def _build_progress_instruction(persona_id: str) -> str:
+    """
+    Carries done/partly-done status forward from an earlier plan run today
+    into this new one - so marking something "done" in the morning means
+    it doesn't reappear in the afternoon plan, and a "partly done" item
+    reappears reflecting only what's actually left, not the whole
+    original task. Returns "" if there's no prior run or nothing was
+    marked, so a first-ever run is unaffected.
+    """
+    previous_run = run_state.get_last_run(persona_id)
+    if not previous_run:
+        return ""
+
+    done_titles = [i.title for i in previous_run.plan if i.status == "done"]
+    partly_done = [(i.title, i.progress_note) for i in previous_run.plan if i.status == "partly_done" and i.progress_note]
+
+    if not done_titles and not partly_done:
+        return ""
+
+    parts = ["The colleague already checked in on their plan earlier today. Take this into account:"]
+    if done_titles:
+        done_list = "; ".join(done_titles)
+        parts.append(f"These items are now FULLY DONE - do not include them again unless new tool data shows a genuinely new, separate issue: {done_list}.")
+    for title, note in partly_done:
+        parts.append(
+            f'"{title}" was marked PARTLY DONE with this note from the colleague: "{note}". '
+            f"If this is still relevant, include an item reflecting only the remaining work described in that note, "
+            f"not the original task as a whole."
+        )
+    return " ".join(parts)
 
 
 def _reason_over_tool_data(as_of: str, time_of_day: str, tool_data: dict, extra_instruction: str = ""):

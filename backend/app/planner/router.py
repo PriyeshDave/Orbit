@@ -14,8 +14,8 @@ from app.planner import state as run_state
 from app.planner.mcp_client_manager import discover_server
 from app.planner.schemas import (
     ChatRequest, ChatResponse, MCPDiscoveryResponse, MCPServerDiscovery,
-    PlanFeedbackRequest, PlanRunLogResponse, SREIncidentActionRequest, SREIncidentActionResponse,
-    ToolsStatusResponse, ToolStatus,
+    PlanFeedbackRequest, PlanRunLogResponse, PlanStatusRequest, SREIncidentActionRequest,
+    SREIncidentActionResponse, ToolsStatusResponse, ToolStatus,
 )
 
 router = APIRouter(prefix="/api/planner", tags=["planner"])
@@ -63,6 +63,35 @@ async def run_plan_stream(time_of_day: str, free_text: str | None = None, x_sess
         yield {"event": "done", "data": "{}"}
 
     return EventSourceResponse(event_generator())
+
+
+@router.post("/plan/status", response_model=PlanRunLogResponse)
+def update_plan_status(req: PlanStatusRequest, x_session_token: str | None = Header(default=None)):
+    """
+    Marks one plan item done or partly-done. This mutates the persisted
+    run in place (the single source of truth for "what does today's plan
+    look like right now") rather than a separate status store - so the
+    Home dashboard, this page, and the next time-of-day's plan run all
+    read the same state. A partly-done item requires a note describing
+    what's left, since that note is what carries forward into the next
+    plan run.
+    """
+    persona_id = _persona_from_header(x_session_token)
+    if req.status == "partly_done" and not (req.note and req.note.strip()):
+        raise HTTPException(status_code=400, detail="A note describing what's left is required for a partly-done item.")
+
+    last_run = run_state.get_last_run(persona_id)
+    if not last_run:
+        raise HTTPException(status_code=404, detail="No plan has been run yet for this persona.")
+
+    item = next((i for i in last_run.plan if i.title == req.item_title), None)
+    if not item:
+        raise HTTPException(status_code=404, detail=f"No plan item titled '{req.item_title}' in the current plan.")
+
+    item.status = req.status
+    item.progress_note = req.note if req.status == "partly_done" else None
+    run_state.save_run(persona_id, last_run)
+    return last_run
 
 
 @router.get("/plan/run-log", response_model=PlanRunLogResponse)

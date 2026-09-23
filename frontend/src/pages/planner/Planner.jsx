@@ -27,6 +27,10 @@ export default function Planner() {
   const [feedbackNote, setFeedbackNote] = useState(null);
   const esRef = useRef(null);
 
+  function handleStatusChange(updatedRun) {
+    setPlan(updatedRun.plan);
+  }
+
   async function handleFeedback(itemTitle, feedback, note) {
     setAdjusting(true);
     setFeedbackNote(null);
@@ -192,7 +196,7 @@ export default function Planner() {
           )}
 
           <div style={{ marginTop: 20 }}>
-            <PlanCards plan={plan} onFeedback={hasRun && !running ? handleFeedback : null} adjusting={adjusting} />
+            <PlanCards plan={plan} onFeedback={hasRun && !running ? handleFeedback : null} onStatusChange={handleStatusChange} adjusting={adjusting} />
           </div>
         </div>
       </div>

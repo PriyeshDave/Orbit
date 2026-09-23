@@ -100,6 +100,13 @@ export const api = {
         body: JSON.stringify({ item_title: itemTitle, feedback, note }),
       }).then(handleResponse),
 
+    updatePlanStatus: (itemTitle, status, note, sessionToken) =>
+      fetch(`${API_BASE}/api/planner/plan/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders(sessionToken) },
+        body: JSON.stringify({ item_title: itemTitle, status, note: note || null }),
+      }).then(handleResponse),
+
     getSreDashboard: (sessionToken) =>
       fetch(`${API_BASE}/api/planner/sre/dashboard`, { headers: authHeaders(sessionToken) }).then(handleResponse),
 

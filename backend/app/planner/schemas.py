@@ -73,6 +73,16 @@ class PlanItem(BaseModel):
     source_tool: ToolKey
     urgency: Literal["critical", "high", "medium", "low"]
     suggested_action: str
+    due_context: Optional[str] = None
+    blocked_info: Optional[str] = None
+    status: Literal["pending", "done", "partly_done"] = "pending"
+    progress_note: Optional[str] = None
+
+
+class PlanStatusRequest(BaseModel):
+    item_title: str
+    status: Literal["done", "partly_done"]
+    note: Optional[str] = None
 
 
 class PlanRunSummary(BaseModel):

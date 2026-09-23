@@ -142,11 +142,28 @@ def home_summary(x_session_token: str | None = Header(default=None)):
     # --- Planner: has a plan been generated yet today, top priority if so ---
     from app.planner import state as planner_state
     last_plan = planner_state.get_last_run(persona_id)
+
+    top_priority_item = None
+    completed_count = 0
+    partly_done_count = 0
+    if last_plan:
+        for item in last_plan.plan:
+            if item.status == "done":
+                completed_count += 1
+            elif item.status == "partly_done":
+                partly_done_count += 1
+        remaining = sorted((i for i in last_plan.plan if i.status != "done"), key=lambda i: i.rank)
+        if remaining:
+            top_priority_item = remaining[0]
+
     planner_summary = {
         "has_plan": last_plan is not None,
         "connected_tools": persona.get("connected_tools", []) if persona else [],
-        "top_priority": (last_plan.plan[0].title if last_plan and last_plan.plan else None),
+        "top_priority": top_priority_item.title if top_priority_item else None,
+        "top_priority_item": top_priority_item.model_dump() if top_priority_item else None,
         "plan_item_count": len(last_plan.plan) if last_plan else 0,
+        "completed_count": completed_count,
+        "partly_done_count": partly_done_count,
     }
 
     # --- Readiness: static pointer to the one tracked project (no per-persona state) ---
