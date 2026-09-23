@@ -1,3 +1,0 @@
-source /Users/priyeshdave6/Documents/Work/VirtualEnvironments/Priyesh-Venvs/agenticai_venv/growth_hack_2026_venv/bin/activate
-uvicorn app.main:app --reload
-npm run dev
